@@ -19,10 +19,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create Pull Request
+      - name: Prepare Changes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Configure git
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          
           # Check if there are any differences with upstream
           git remote add upstream https://github.com/meswan-ka/FlowCSSLWC.git || true
           git fetch upstream main
@@ -33,30 +37,61 @@ jobs:
             exit 0
           fi
           
-          # Get the latest commit message for PR description
-          LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
+          # Create a new branch for the squashed commit
+          BRANCH_NAME="auto-pr-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b $BRANCH_NAME
+          
+          # Get all commit messages since upstream/main
+          COMMITS_SINCE_UPSTREAM=$(git log upstream/main..HEAD --pretty=format:"- %s" | head -20)
+          COMMIT_COUNT=$(git rev-list --count upstream/main..HEAD)
+          
+          # Create a comprehensive commit message
+          if [ $COMMIT_COUNT -eq 1 ]; then
+            # If only one commit, use its message
+            SQUASH_MSG=$(git log -1 --pretty=%B)
+          else
+            # Multiple commits - create a summary
+            SQUASH_MSG="Squashed $COMMIT_COUNT commits from fork
+
+Changes included:
+$COMMITS_SINCE_UPSTREAM"
+          fi
+          
+          # Squash all commits since upstream/main into one
+          git reset --soft upstream/main
+          git commit -m "$SQUASH_MSG"
+          
+          # Push the new branch
+          git push origin $BRANCH_NAME
           
           # Set PR title
           if [ -n "${{ github.event.inputs.pr_title }}" ]; then
             PR_TITLE="${{ github.event.inputs.pr_title }}"
+          elif [ $COMMIT_COUNT -eq 1 ]; then
+            PR_TITLE=$(git log -1 --pretty=%s)
           else
-            PR_TITLE="Sync: $(git log -1 --pretty=%s)"
+            PR_TITLE="Sync: $COMMIT_COUNT changes from fork"
           fi
           
-          # Create PR using GitHub CLI
+          # Create PR using GitHub CLI from the new branch
           gh pr create \
             --base main \
-            --head Marceswan:main \
+            --head Marceswan:$BRANCH_NAME \
             --repo meswan-ka/FlowCSSLWC \
             --title "$PR_TITLE" \
             --body "## Automated PR from Fork
 
-          ### Latest Changes:
-          $LAST_COMMIT_MSG
+          ### Summary:
+          This PR contains $COMMIT_COUNT squashed commit(s) from the fork.
+
+          ### Changes included:
+          $COMMITS_SINCE_UPSTREAM
           
-          ### Commits included:
-          $(git log upstream/main..HEAD --oneline)
+          ### Original commits:
+          \`\`\`
+          $(git log upstream/main..origin/main --oneline)
+          \`\`\`
           
           ---
-          *This PR was automatically created by GitHub Actions*" \
+          *This PR was automatically created by GitHub Actions with commits auto-squashed for cleaner history.*" \
           || echo "PR already exists or could not be created"
