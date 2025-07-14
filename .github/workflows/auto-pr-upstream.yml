@@ -86,8 +86,21 @@ jobs:
 
       - name: Create Pull Request
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Use PAT if available, otherwise fall back to GITHUB_TOKEN
+          GH_TOKEN: ${{ secrets.PAT_UPSTREAM || secrets.GITHUB_TOKEN }}
         run: |
+          # Check if we have a PAT configured
+          if [ "${{ secrets.PAT_UPSTREAM }}" == "" ]; then
+            echo "⚠️ No PAT_UPSTREAM secret found. Cannot create PR to external repository."
+            echo "To enable automatic PR creation:"
+            echo "1. Create a Personal Access Token with 'repo' scope"
+            echo "2. Add it as a secret named PAT_UPSTREAM in your repository settings"
+            echo ""
+            echo "Manual PR command:"
+            echo "gh pr create --base main --head Marceswan:${{ env.BRANCH_NAME }} --repo meswan-ka/FlowCSSLWC --title \"${{ env.PR_TITLE }}\""
+            exit 0
+          fi
+          
           # Create PR body
           PR_BODY=$(cat <<EOF
           ## Automated PR from Fork
