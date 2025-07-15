@@ -16,3 +16,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ github.event.pull_request.number }}
           merge-method: squash  # or 'merge' or 'rebase'
+
+permissions:
+    contents: write
+    pull-requests: write
