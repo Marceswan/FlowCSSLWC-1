@@ -35,6 +35,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
@@ -48,6 +52,18 @@ jobs:
           pull-request-number: ${{ github.event.pull_request.number }}
           merge-method: squash  # or 'merge' or 'rebase'
 ```
+
+**Important**: The `permissions` section is required for the workflow to have write access.
+
+#### Alternative: Manual Auto-merge
+
+If the workflow approach doesn't work, you can manually enable auto-merge for specific PRs:
+
+1. Open the PR
+2. Click the dropdown arrow next to "Merge pull request"
+3. Select "Enable auto-merge"
+4. Choose your merge method (squash recommended)
+5. The PR will merge automatically when all requirements are met
 
 ### 4. Add CODEOWNERS File (Optional)
 
